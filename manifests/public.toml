@@ -1,0 +1,34 @@
+# sample-web — PUBLIC variant.
+#
+# is_public = true tells the platform's ingress driver to expose this
+# workload on a public hostname with TLS (the ingress + cert are
+# rendered by the ingress driver, not declared here — the manifest
+# schema has no ingress/TLS keys; is_public is the whole contract).
+#
+# image_ref is the pushed Docker Hub image. main-latest is a placeholder
+# the campaign rewrites to a concrete main-<sha7> tag at deploy time.
+name = "sample-web"
+
+[[workloads]]
+name = "web"
+kind = "deployment"
+is_public = true
+replicas = 2
+cpu_request = "50m"
+cpu_limit = "250m"
+memory_request = "64Mi"
+memory_limit = "128Mi"
+
+  [[workloads.containers]]
+  name = "app"
+  is_primary = true
+  image_ref = "docker.io/calliopeai/astrolift-sample-web:main-latest"
+  port = 8080
+
+    [workloads.containers.env]
+    LOG_LEVEL = "info"
+
+    [workloads.containers.healthcheck]
+    kind = "http"
+    value = "/health"
+    port = 8080

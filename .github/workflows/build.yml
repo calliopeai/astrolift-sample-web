@@ -1,0 +1,65 @@
+name: Build and Publish
+
+# Builds the sample-web image and pushes it to Docker Hub as
+# docker.io/calliopeai/astrolift-sample-web. Mirrors the publish pattern
+# in astrolift-agents/.github/workflows/build-images.yml: docker/login-
+# action@v3 with the org-level DOCKERHUB_USERNAME / DOCKERHUB_TOKEN
+# secrets (visibility=ALL — inherited by every calliopeai repo).
+#
+# Deterministic main-<sha7> tags are what deploys pin to; :latest is a
+# convenience pointer only. Pull requests build (to catch breakage) but
+# do not push.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  REGISTRY_DOCKERHUB: docker.io
+  NAMESPACE: calliopeai
+  IMAGE: astrolift-sample-web
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute tags
+        id: tags
+        run: |
+          echo "sha=main-${GITHUB_SHA::7}" >>"$GITHUB_OUTPUT"
+          echo "built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$GITHUB_OUTPUT"
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "push=true" >>"$GITHUB_OUTPUT"
+          else
+            echo "push=false" >>"$GITHUB_OUTPUT"
+          fi
+
+      - name: Log in to Docker Hub
+        if: steps.tags.outputs.push == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY_DOCKERHUB }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build image
+        run: |
+          IMG="${REGISTRY_DOCKERHUB}/${NAMESPACE}/${IMAGE}"
+          docker build \
+            --build-arg "GIT_SHA=${{ steps.tags.outputs.sha }}" \
+            --build-arg "IMAGE_REF=${IMG}:${{ steps.tags.outputs.sha }}" \
+            --build-arg "BUILT_AT=${{ steps.tags.outputs.built_at }}" \
+            -t "${IMG}:${{ steps.tags.outputs.sha }}" \
+            -t "${IMG}:latest" \
+            .
+
+      - name: Push tags (Docker Hub)
+        if: steps.tags.outputs.push == 'true'
+        run: |
+          IMG="${REGISTRY_DOCKERHUB}/${NAMESPACE}/${IMAGE}"
+          docker push "${IMG}:${{ steps.tags.outputs.sha }}"
+          docker push "${IMG}:latest"
