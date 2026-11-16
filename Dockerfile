@@ -4,7 +4,7 @@
 # image. GIT_SHA is passed as a build-arg by .github/workflows/build.yml
 # and baked in as an env var so /debug and /api/info report the commit
 # the image was built from.
-FROM node:20-alpine
+FROM node:20-bookworm-slim
 
 # Build metadata (build-args -> baked env). Defaults keep `docker build`
 # with no args working; CI passes the real values.
